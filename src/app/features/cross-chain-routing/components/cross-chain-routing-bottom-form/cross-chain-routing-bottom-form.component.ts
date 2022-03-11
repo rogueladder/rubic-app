@@ -137,6 +137,13 @@ export class CrossChainRoutingBottomFormComponent implements OnInit {
     );
   };
 
+  public onTxHash = (txHash: string): void => {
+    this.tradeStatus = TRADE_STATUS.READY_TO_SWAP;
+
+    this.notifyGtmAfterSignTx(txHash);
+    this.notifyTradeInProgress(txHash);
+  };
+
   constructor(
     public readonly swapFormService: SwapFormService,
     private readonly errorsService: ErrorsService,
@@ -434,17 +441,9 @@ export class CrossChainRoutingBottomFormComponent implements OnInit {
   public async createTrade(): Promise<void> {
     this.tradeStatus = TRADE_STATUS.SWAP_IN_PROGRESS;
     this.onRefreshStatusChange.emit(REFRESH_BUTTON_STATUS.IN_PROGRESS);
-
-    const onTransactionHash = (txHash: string) => {
-      this.tradeStatus = TRADE_STATUS.READY_TO_SWAP;
-
-      this.notifyGtmAfterSignTx(txHash);
-      this.notifyTradeInProgress(txHash);
-    };
-
     this.crossChainRoutingService
       .createTrade({
-        onTransactionHash
+        onTransactionHash: this.onTxHash
       })
       .pipe(first())
       .subscribe(

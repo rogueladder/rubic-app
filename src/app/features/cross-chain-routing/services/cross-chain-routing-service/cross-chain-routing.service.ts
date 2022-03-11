@@ -16,7 +16,10 @@ import { Web3Pure } from '@core/services/blockchain/blockchain-adapters/common/w
 import UnsupportedTokenCCR from '@core/errors/models/cross-chain-routing/unsupported-token-ccr';
 import { WalletConnectorService } from '@core/services/blockchain/wallets/wallet-connector-service/wallet-connector.service';
 import { BlockchainToken } from '@shared/models/tokens/blockchain-token';
-import { PublicBlockchainAdapterService } from '@core/services/blockchain/blockchain-adapters/public-blockchain-adapter.service';
+import {
+  PublicBlockchainAdapterService,
+  Web3SupportedBlockchains
+} from '@core/services/blockchain/blockchain-adapters/public-blockchain-adapter.service';
 import { Injectable } from '@angular/core';
 import { EthLikeWeb3PrivateService } from '@core/services/blockchain/blockchain-adapters/eth-like/web3-private/eth-like-web3-private.service';
 import InsufficientLiquidityError from '@core/errors/models/instant-trade/insufficient-liquidity-error';
@@ -47,18 +50,29 @@ import { NotificationsService } from '@core/services/notifications/notifications
 import { TranslateService } from '@ngx-translate/core';
 import { INSTANT_TRADES_PROVIDERS } from '@app/shared/models/instant-trade/instant-trade-providers';
 import { SmartRouting } from './models/smart-routing.interface';
+import { InterchainMessageService } from '../inter-chain-message-framework/inter-chain-message.service';
 
 interface TradeAndToAmount {
   trade: InstantTrade | null;
   toAmount: BigNumber;
 }
 
-interface IndexedTradeAndToAmount {
+export interface IndexedTradeAndToAmount {
   providerIndex: number;
   tradeAndToAmount: TradeAndToAmount;
 }
 
 const CACHEABLE_MAX_AGE = 15_000;
+
+const unsupportedTokenErrors = [
+  'execution reverted: TransferHelper: TRANSFER_FROM_FAILED',
+  'execution reverted: UniswapV2: K',
+  'execution reverted: UniswapV2:  TRANSFER_FAILED',
+  'execution reverted: Pancake: K',
+  'execution reverted: Pancake:  TRANSFER_FAILED',
+  'execution reverted: Solarbeam: K',
+  'execution reverted: Solarbeam:  TRANSFER_FAILED'
+];
 
 @Injectable({
   providedIn: 'root'
@@ -76,6 +90,10 @@ export class CrossChainRoutingService {
 
   public readonly smartRouting$ = this._smartRouting$.asObservable();
 
+  get smartRouting(): SmartRouting {
+    return this._smartRouting$.getValue();
+  }
+
   private readonly _smartRoutingLoading$ = new BehaviorSubject<boolean>(false);
 
   public readonly smartRoutingLoading$ = this._smartRoutingLoading$.asObservable();
@@ -83,6 +101,8 @@ export class CrossChainRoutingService {
   private readonly contracts = this.contractsDataService.contracts;
 
   private currentCrossChainTrade: CrossChainTrade;
+
+  private shouldSwapViaIm: boolean;
 
   /**
    * Gets slippage, selected in settings, divided by 100%.
@@ -108,7 +128,8 @@ export class CrossChainRoutingService {
     private readonly gtmService: GoogleTagManagerService,
     private readonly iframeService: IframeService,
     private readonly notificationsService: NotificationsService,
-    private readonly translateService: TranslateService
+    private readonly translateService: TranslateService,
+    private readonly interchainMessageSerivce: InterchainMessageService
   ) {}
 
   private async needApprove(
@@ -226,6 +247,7 @@ export class CrossChainRoutingService {
 
     await this.calculateSmartRouting(
       sourceBlockchainProviders,
+      targetBlockchainProviders,
       filteredTargetBlockchainProviders,
       fromBlockchain,
       toBlockchain,
@@ -246,11 +268,40 @@ export class CrossChainRoutingService {
       ? toAmount
       : toAmount.dividedBy(fromSlippage);
 
+    this.shouldSwapViaIm = this.getShouldSwapViaIm(
+      fromBlockchain,
+      toBlockchain,
+      fromProviderIndex,
+      toProviderIndex,
+      fromTransitTokenAmount,
+      minMaxErrors
+    );
+
     return {
       toAmount: toAmountWithoutSlippage,
       ...minMaxErrors,
       needApprove
     };
+  }
+
+  public async swapViaImFramework(onTxHash: (txHash: string) => void): Promise<string> {
+    const { fromAmount, fromBlockchain, fromToken, toToken, toBlockchain } =
+      this.swapFormService.inputValue;
+
+    try {
+      const transactionHash = await this.interchainMessageSerivce.interChainMessageSwap(
+        fromAmount,
+        fromBlockchain as Web3SupportedBlockchains,
+        fromToken,
+        toToken,
+        toBlockchain as Web3SupportedBlockchains,
+        this.smartRouting,
+        onTxHash
+      );
+      return transactionHash;
+    } catch (err) {
+      throw new Error(err);
+    }
   }
 
   /**
@@ -725,11 +776,16 @@ export class CrossChainRoutingService {
               'The swap between NEAR and SOLANA is currently not available. The support is coming soon.'
             );
           }
-          transactionHash = await this.contractExecutorFacade.executeTrade(
-            this.currentCrossChainTrade,
-            options,
-            this.authService.userAddress
-          );
+
+          if (this.shouldSwapViaIm) {
+            transactionHash = await this.swapViaImFramework(options?.onTransactionHash);
+          } else {
+            transactionHash = await this.contractExecutorFacade.executeTrade(
+              this.currentCrossChainTrade,
+              options,
+              this.authService.userAddress
+            );
+          }
 
           await this.postCrossChainTradeAndNotifyGtm(transactionHash);
         } catch (err) {
@@ -747,16 +803,6 @@ export class CrossChainRoutingService {
               this.currentCrossChainTrade.tokenIn.symbol
             );
           }
-
-          const unsupportedTokenErrors = [
-            'execution reverted: TransferHelper: TRANSFER_FROM_FAILED',
-            'execution reverted: UniswapV2: K',
-            'execution reverted: UniswapV2:  TRANSFER_FAILED',
-            'execution reverted: Pancake: K',
-            'execution reverted: Pancake:  TRANSFER_FAILED',
-            'execution reverted: Solarbeam: K',
-            'execution reverted: Solarbeam:  TRANSFER_FAILED'
-          ];
 
           if (
             unsupportedTokenErrors.some(errText =>
@@ -801,16 +847,51 @@ export class CrossChainRoutingService {
     }
   }
 
+  private getShouldSwapViaIm(
+    fromBlockchain: BLOCKCHAIN_NAME,
+    toBlockchain: BLOCKCHAIN_NAME,
+    fromProviderIndex: number,
+    toProviderIndex: number,
+    fromTransitTokenAmount: BigNumber,
+    minMaxErrors: { minAmountError?: BigNumber; maxAmountError?: BigNumber }
+  ): boolean {
+    const sourceBlockchainContract = this.contracts[fromBlockchain as Web3SupportedBlockchains];
+    const isUnsupportedDexInSourceNetwork =
+      sourceBlockchainContract.isProviderUniV3(fromProviderIndex) ||
+      sourceBlockchainContract.isProviderOneinch(fromProviderIndex);
+
+    const targetBlockchainContract = this.contracts[toBlockchain as Web3SupportedBlockchains];
+    const isUnsupportedDexInTargetNetwork =
+      targetBlockchainContract.isProviderUniV3(toProviderIndex) ||
+      targetBlockchainContract.isProviderOneinch(toProviderIndex);
+
+    if (isUnsupportedDexInSourceNetwork || isUnsupportedDexInTargetNetwork) {
+      return false;
+    } else {
+      if (
+        fromTransitTokenAmount.lt(minMaxErrors.minAmountError) ||
+        fromTransitTokenAmount.gt(minMaxErrors.maxAmountError)
+      ) {
+        return true;
+      } else {
+        return false;
+      }
+    }
+  }
+
   private async calculateSmartRouting(
     sourceBlockchainProviders: IndexedTradeAndToAmount[],
     targetBlockchainProviders: IndexedTradeAndToAmount[],
+    filteredTargetBlockchainProviders: IndexedTradeAndToAmount[],
     fromBlockchain: SupportedCrossChainBlockchain,
     toBlockchain: SupportedCrossChainBlockchain,
     toToken: string
   ): Promise<void> {
     const [sourceBestProvider, sourceWorseProvider] = sourceBlockchainProviders;
-    const [targetBestProvider, targetWorstProvider] = targetBlockchainProviders;
+    const [targetBestProvider, targetWorstProvider] = filteredTargetBlockchainProviders;
     const smartRouting = {
+      sourceBlockchainProviders,
+      targetBlockchainProviders,
       fromProvider: this.getProviderType(fromBlockchain, sourceBestProvider.providerIndex),
       toProvider: this.getProviderType(toBlockchain, targetBestProvider.providerIndex),
       fromHasTrade: Boolean(sourceBestProvider?.tradeAndToAmount.trade),
@@ -824,7 +905,7 @@ export class CrossChainRoutingService {
       blockchain: toBlockchain
     });
     const hasSourceTrades = Boolean(sourceBlockchainProviders[0]?.tradeAndToAmount.trade);
-    const hasTargetTrades = Boolean(targetBlockchainProviders[0]?.tradeAndToAmount.trade);
+    const hasTargetTrades = Boolean(filteredTargetBlockchainProviders[0]?.tradeAndToAmount.trade);
 
     if (hasSourceTrades && !hasTargetTrades) {
       smartRouting.savings = sourceBestProvider?.tradeAndToAmount.toAmount.minus(
@@ -839,7 +920,7 @@ export class CrossChainRoutingService {
     }
 
     if (hasSourceTrades && hasTargetTrades) {
-      if (targetBlockchainProviders.length > 1 && sourceBlockchainProviders.length > 1) {
+      if (filteredTargetBlockchainProviders.length > 1 && sourceBlockchainProviders.length > 1) {
         const tokenAmountViaWorstProvider = targetWorstProvider?.tradeAndToAmount.trade.to.amount
           .dividedBy(sourceBestUSDC)
           .multipliedBy(sourceWorseUSDC);
@@ -849,13 +930,13 @@ export class CrossChainRoutingService {
           .multipliedBy(toTokenUsdcPrice);
       }
 
-      if (targetBlockchainProviders.length <= 1 && sourceBlockchainProviders.length > 1) {
+      if (filteredTargetBlockchainProviders.length <= 1 && sourceBlockchainProviders.length > 1) {
         smartRouting.savings = sourceBestProvider.tradeAndToAmount.toAmount.minus(
           sourceWorseProvider.tradeAndToAmount.toAmount
         );
       }
 
-      if (targetBlockchainProviders.length > 1 && sourceBlockchainProviders.length <= 1) {
+      if (filteredTargetBlockchainProviders.length > 1 && sourceBlockchainProviders.length <= 1) {
         smartRouting.savings = targetBestProvider.tradeAndToAmount.toAmount
           .minus(targetWorstProvider.tradeAndToAmount.toAmount)
           .multipliedBy(toTokenUsdcPrice);
