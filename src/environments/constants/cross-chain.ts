@@ -4,7 +4,6 @@ import { SupportedCrossChainBlockchain } from '@features/cross-chain-routing/ser
 type CrossChainConstants = {
   apiBaseUrl: string;
   contractAddresses: Record<SupportedCrossChainBlockchain, string>;
-  celerContractAddress: string;
 };
 
 export const CROSS_CHAIN_DEV: CrossChainConstants = {
@@ -21,8 +20,7 @@ export const CROSS_CHAIN_DEV: CrossChainConstants = {
     [BLOCKCHAIN_NAME.ARBITRUM]: '0x5F3c8d58A01Aad4f875d55E2835D82e12f99723c',
     [BLOCKCHAIN_NAME.AURORA]: '0x55Be05ecC1c417B16163b000CB71DcE8526a5D06',
     [BLOCKCHAIN_NAME.NEAR]: 'multichain.rubic-finance.near'
-  },
-  celerContractAddress: '123'
+  }
 };
 
 export const CROSS_CHAIN_PROD: CrossChainConstants = {
@@ -39,6 +37,5 @@ export const CROSS_CHAIN_PROD: CrossChainConstants = {
     [BLOCKCHAIN_NAME.ARBITRUM]: '0x5F3c8d58A01Aad4f875d55E2835D82e12f99723c',
     [BLOCKCHAIN_NAME.AURORA]: '0x55Be05ecC1c417B16163b000CB71DcE8526a5D06',
     [BLOCKCHAIN_NAME.NEAR]: 'multichain.rubic-finance.near'
-  },
-  celerContractAddress: '123'
+  }
 };
