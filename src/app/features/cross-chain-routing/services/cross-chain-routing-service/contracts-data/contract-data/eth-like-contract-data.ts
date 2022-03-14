@@ -11,7 +11,9 @@ import { ContractExecutorFacadeService } from '@features/cross-chain-routing/ser
 import { BLOCKCHAIN_NAME } from '@shared/models/blockchain/blockchain-name';
 import { SolanaWeb3Public } from '@core/services/blockchain/blockchain-adapters/solana/solana-web3-public';
 import { OneinchInstantTrade } from '@features/instant-trade/services/instant-trade-service/providers/common/oneinch/common-oneinch/models/oneinch-instant-trade';
+import { BlockchainNumber } from '@features/cross-chain-routing/services/cross-chain-routing-service/contracts-data/contract-data/models/blockchain-number';
 import BigNumber from 'bignumber.js';
+import { EMPTY_ADDRESS } from '@shared/constants/blockchain/empty-address';
 
 export class EthLikeContractData extends ContractData {
   private readonly blockchainAdapter: EthLikeWeb3Public;
@@ -19,7 +21,7 @@ export class EthLikeContractData extends ContractData {
   constructor(
     public readonly blockchain: SupportedCrossChainBlockchain,
     public readonly providersData: ProviderData[],
-    public readonly numOfBlockchain: number,
+    public readonly numOfBlockchain: BlockchainNumber,
     publicBlockchainAdapterService: PublicBlockchainAdapterService
   ) {
     super(blockchain, providersData, numOfBlockchain);
@@ -44,13 +46,13 @@ export class EthLikeContractData extends ContractData {
     );
   }
 
-  public feeAmountOfBlockchain(): Promise<string> {
+  public feeAmountOfBlockchain(numOfFromBlockchain: number): Promise<string> {
     return this.blockchainAdapter.callContractMethod(
       this.address,
       crossChainContractAbi,
       'feeAmountOfBlockchain',
       {
-        methodArguments: [this.numOfBlockchain]
+        methodArguments: [numOfFromBlockchain]
       }
     );
   }
@@ -127,6 +129,8 @@ export class EthLikeContractData extends ContractData {
       toWalletAddressBytes32 = EthLikeWeb3Public.addressToBytes32(toWalletAddress);
     }
 
+    const provider = EMPTY_ADDRESS;
+
     const swapToUserMethodSignature = toContract.getSwapToUserMethodName(
       trade.toProviderIndex,
       isToTokenNative
@@ -141,6 +145,7 @@ export class EthLikeContractData extends ContractData {
         fromTransitTokenAmountMinAbsolute,
         tokenOutAmountMinAbsolute,
         toWalletAddressBytes32,
+        provider,
         isToTokenNative
       ]
     ];

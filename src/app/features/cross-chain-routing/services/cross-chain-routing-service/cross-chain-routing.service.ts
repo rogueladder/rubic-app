@@ -194,9 +194,24 @@ export class CrossChainRoutingService {
       tradeAndToAmount: { trade: fromTrade, toAmount: fromTransitTokenAmount }
     } = sourceBlockchainProviders[0];
 
+    const cryptoFee = await this.getCryptoFee(fromBlockchain, toBlockchain);
+
+    let finalTransitAmount = fromTransitTokenAmount;
+
+    /**
+     * @TODO Take crypto fee on contract.
+     */
+    if (fromBlockchain === BLOCKCHAIN_NAME.NEAR) {
+      const nativeUsdPrice = await this.tokensService.getNativeCoinPriceInUsd(BLOCKCHAIN_NAME.NEAR);
+      const feeInUsd = cryptoFee.multipliedBy(nativeUsdPrice);
+
+      finalTransitAmount = fromTransitTokenAmount.minus(feeInUsd);
+    }
+
     const { toTransitTokenAmount, feeInPercents } = await this.getToTransitTokenAmount(
+      fromBlockchain,
       toBlockchain,
-      fromTransitTokenAmount,
+      finalTransitAmount,
       fromTrade === null,
       fromSlippage
     );
@@ -221,8 +236,6 @@ export class CrossChainRoutingService {
       providerIndex: toProviderIndex,
       tradeAndToAmount: { trade: toTrade, toAmount }
     } = filteredTargetBlockchainProviders[0];
-
-    const cryptoFee = await this.getCryptoFee(fromBlockchain, toBlockchain);
 
     this.currentCrossChainTrade = {
       fromBlockchain,
@@ -487,18 +500,20 @@ export class CrossChainRoutingService {
 
   /**
    * Calculates transit token's amount in target blockchain, based on transit token's amount is source blockchain.
+   * @param fromBlockchain Source blockchain
    * @param toBlockchain Target blockchain
    * @param fromTransitTokenAmount Amount of transit token in source blockchain.
    * @param isDirectTrade True, if first transit token is traded directrly.
    * @param fromSlippage Slippage in source blockchain.
    */
   private async getToTransitTokenAmount(
+    fromBlockchain: SupportedCrossChainBlockchain,
     toBlockchain: SupportedCrossChainBlockchain,
     fromTransitTokenAmount: BigNumber,
     isDirectTrade: boolean,
     fromSlippage: number
   ): Promise<{ toTransitTokenAmount: BigNumber; feeInPercents: number }> {
-    const feeInPercents = await this.getFeeInPercents(toBlockchain);
+    const feeInPercents = await this.getFeeInPercents(fromBlockchain, toBlockchain);
     let toTransitTokenAmount = fromTransitTokenAmount
       .multipliedBy(100 - feeInPercents)
       .dividedBy(100);
@@ -515,10 +530,17 @@ export class CrossChainRoutingService {
 
   /**
    * Gets fee amount of transit token in percents in target blockchain.
+   * @param fromBlockchain Source blockchain.
    * @param toBlockchain Target blockchain.
    */
-  private async getFeeInPercents(toBlockchain: SupportedCrossChainBlockchain): Promise<number> {
-    const feeOfToBlockchainAbsolute = await this.contracts[toBlockchain].feeAmountOfBlockchain();
+  private async getFeeInPercents(
+    fromBlockchain: SupportedCrossChainBlockchain,
+    toBlockchain: SupportedCrossChainBlockchain
+  ): Promise<number> {
+    const numOfFromBlockchain = this.contracts[fromBlockchain].numOfBlockchain;
+    const feeOfToBlockchainAbsolute = await this.contracts[toBlockchain].feeAmountOfBlockchain(
+      numOfFromBlockchain
+    );
     return parseInt(feeOfToBlockchainAbsolute) / 10000; // to %
   }
 
@@ -767,29 +789,11 @@ export class CrossChainRoutingService {
 
         let transactionHash;
         try {
-          // @TODO Near fix. Near addresses is not supported by Solana contracts yet.
-          if (
-            (this.currentCrossChainTrade.fromBlockchain === BLOCKCHAIN_NAME.NEAR &&
-              this.currentCrossChainTrade.toBlockchain === BLOCKCHAIN_NAME.NEAR) ||
-            (this.currentCrossChainTrade.fromBlockchain === BLOCKCHAIN_NAME.NEAR &&
-              this.currentCrossChainTrade.toBlockchain === BLOCKCHAIN_NAME.SOLANA)
-          ) {
-            throw new CustomError(
-              'The swap between NEAR and SOLANA is currently not available. The support is coming soon.'
-            );
-          }
-
-          if (true) {
-            console.log('sgn');
-            transactionHash = await this.swapViaImFramework(options?.onTransactionHash);
-          } else {
-            console.log('ccr');
-            transactionHash = await this.contractExecutorFacade.executeTrade(
-              this.currentCrossChainTrade,
-              options,
-              this.authService.userAddress
-            );
-          }
+          transactionHash = await this.contractExecutorFacade.executeTrade(
+            this.currentCrossChainTrade,
+            options,
+            this.authService.userAddress
+          );
 
           await this.postCrossChainTradeAndNotifyGtm(transactionHash);
         } catch (err) {

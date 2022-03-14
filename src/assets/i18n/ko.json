@@ -76,6 +76,7 @@
     "insufficientFoundsGasPriceValue": "Insufficient funds for the gas fee. Please top-up you {{nativeToken}} balance.",
     "NoDataMyTradesError": "죄송합니다. 문제가 발생했습니다. 페이지를 새로고침해 보세요. 다시 로드한 후에도 이 문제가 계속 발생하면 지원팀에 문의하세요.",
     "rubicOptimisation": "이 거래에 대한 유동성이 충분하지 않습니다. 루빅 최적화를 비활성화하십시오.",
+    "partialTradesData": "We are faced with the problem of getting transactions data from the server. Please reload the page or contact support if the problem remains.",
     "tradingIsNotAvailable": "거래 불가",
     "wrongWallet": "Please log in with wallet that supports {{network}} network",
     "invalidTargetAddress": "Invalid target network address",
@@ -90,7 +91,6 @@
     "about": "소개",
     "features": "기능",
     "faq": "FAQ",
-    "team": "팀",
     "project": "프로젝트",
     "login": "메타마스크로 로그인",
     "myTrades": "내 거래",
@@ -273,9 +273,6 @@
         }
       }
     }
-  },
-  "teamPage": {
-    "title": "팀"
   },
   "faqPage": {
     "title": "FAQ",
@@ -497,6 +494,7 @@
       "balance": "You have {{amount}}",
       "unstakeBalance": "Available to unstake {{amount}}",
       "confirmStake": "Confirm stake",
+      "confirmStakeViaWhitelist": "Confirm stake with Whitelist",
       "unstake": "Unstake",
       "overLimit": "One stake limits {{min}} - {{max}} BRBC",
       "globalUpdate": "Global Update",
@@ -627,20 +625,20 @@
     },
     "header": {
       "switchTheme": {
-        "title": "Switch Theme",
-        "desc": "Theme for the web"
+        "title": "테마 전환",
+        "desc": "웹 테마"
       },
       "language": {
-        "title": "Language",
-        "desc": "Choose language"
+        "title": "언어",
+        "desc": "언어 선택"
       },
       "gasPrice": {
         "title": "Gas price",
         "desc": "In Ethereum chain"
       },
       "tutorials": {
-        "title": "Tutorials",
-        "desc": "How to use"
+        "title": "튜토리얼",
+        "desc": "사용하는 방법"
       }
     }
   },
@@ -679,6 +677,7 @@
     "minerFee": "1inch sets increased costs on gas fee. For transaction enter less {{ nativeToken }} amount or top up your {{ nativeToken }} balance.",
     "solanaBeta": "Solana network is in beta now. Use it at your own risk.",
     "stakeInProgress": "Stake in progress",
+    "bridgeStakeInProgress": "Stake in progress. View transaction in <a target=\"_blank\" href=\"{{url}}\">explorer</a>",
     "successfulStake": "Successful stake",
     "successfulWithdraw": "Successful withdraw",
     "withdrawInProgress": "Withdraw in progress",
