@@ -273,7 +273,7 @@ export class CrossChainRoutingService {
       toBlockchain,
       fromProviderIndex,
       toProviderIndex,
-      fromTransitTokenAmount,
+      fromAmount,
       minMaxErrors
     );
 
@@ -433,7 +433,9 @@ export class CrossChainRoutingService {
     const getAmount = async (type: 'minAmount' | 'maxAmount'): Promise<BigNumber> => {
       const contract = this.contracts[fromBlockchain];
       const fromTransitTokenAmountAbsolute =
-        type === 'minAmount' ? await contract.minTokenAmount() : await contract.maxTokenAmount();
+        type === 'minAmount'
+          ? await this.interchainMessageSerivce.getMinTokenAmount(fromBlockchain)
+          : await contract.maxTokenAmount();
       const fromTransitTokenAmount = Web3Pure.fromWei(
         fromTransitTokenAmountAbsolute,
         fromTransitToken.decimals
@@ -777,9 +779,11 @@ export class CrossChainRoutingService {
             );
           }
 
-          if (this.shouldSwapViaIm) {
+          if (true) {
+            console.log('sgn');
             transactionHash = await this.swapViaImFramework(options?.onTransactionHash);
           } else {
+            console.log('ccr');
             transactionHash = await this.contractExecutorFacade.executeTrade(
               this.currentCrossChainTrade,
               options,
@@ -852,7 +856,7 @@ export class CrossChainRoutingService {
     toBlockchain: BLOCKCHAIN_NAME,
     fromProviderIndex: number,
     toProviderIndex: number,
-    fromTransitTokenAmount: BigNumber,
+    fromTokenAmount: BigNumber,
     minMaxErrors: { minAmountError?: BigNumber; maxAmountError?: BigNumber }
   ): boolean {
     const sourceBlockchainContract = this.contracts[fromBlockchain as Web3SupportedBlockchains];
@@ -869,8 +873,8 @@ export class CrossChainRoutingService {
       return false;
     } else {
       if (
-        fromTransitTokenAmount.lt(minMaxErrors.minAmountError) ||
-        fromTransitTokenAmount.gt(minMaxErrors.maxAmountError)
+        fromTokenAmount.lt(minMaxErrors.minAmountError) ||
+        fromTokenAmount.gt(minMaxErrors.maxAmountError)
       ) {
         return true;
       } else {

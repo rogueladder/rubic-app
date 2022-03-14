@@ -7,27 +7,38 @@ import {
   Web3SupportedBlockchains
 } from '@app/core/services/blockchain/blockchain-adapters/public-blockchain-adapter.service';
 import networks from '@app/shared/constants/blockchain/networks';
-import { TRANSFER_SWAP_CONTRACT_BY_BLOCKCHAIN } from './constants/TRANSFER_SWAP_CONTRACT_BY_BLOCKCHAIN';
+import { IM_CONTRACT_BY_BLOCKCHAIN } from './constants/IM_CONTRACT_BY_BLOCKCHAIN';
 import BigNumber from 'bignumber.js';
 import { ImSwapInfo } from './models/im-swap-info.interface';
 import { TokenAmount } from '@app/shared/models/tokens/token-amount';
 import { SmartRouting } from '../cross-chain-routing-service/models/smart-routing.interface';
 import { ContractsDataService } from '../cross-chain-routing-service/contracts-data/contracts-data.service';
-import { IM_FEE_BASE } from './constants/IM_FEE_BASE';
-import { IM_FEE_PER_BYTE } from './constants/IM_FEE_PER_BYTE';
 import { SettingsService } from '@app/features/swaps/services/settings-service/settings.service';
 import { BLOCKCHAIN_NAME } from '@app/shared/models/blockchain/blockchain-name';
+import { MESSAGE_BUS_CONTRACT_ABI } from './constants/MESSAGE_BUS_CONTRACT_ABI';
+import { EthLikeWeb3Pure } from '@app/core/services/blockchain/blockchain-adapters/eth-like/web3-pure/eth-like-web3-pure';
 
 type transferWithSwapArgs = (string | (string | string[])[])[];
 
 @Injectable()
 export class InterchainMessageService {
+  get ccrSlippage(): number {
+    return this.settingsService.crossChainRoutingValue.slippageTolerance / 100;
+  }
+
   constructor(
     private readonly privateBlockchainAdapterService: PrivateBlockchainAdapterService,
     private readonly publicBlockchainAdapterService: PublicBlockchainAdapterService,
     private readonly contractsDataService: ContractsDataService,
     private readonly settingsService: SettingsService
   ) {}
+
+  public async getMinTokenAmount(fromBlockchain: BLOCKCHAIN_NAME): Promise<string> {
+    const imContractAddress = IM_CONTRACT_BY_BLOCKCHAIN[fromBlockchain];
+    return await this.publicBlockchainAdapterService[
+      fromBlockchain as Web3SupportedBlockchains
+    ].callContractMethod(imContractAddress, IM_CONTRACT_ABI, 'minSwapAmount');
+  }
 
   public async interChainMessageSwap(
     fromAmount: BigNumber,
@@ -38,17 +49,18 @@ export class InterchainMessageService {
     smartRouting: SmartRouting,
     onTxHash: (txHash: string) => void
   ): Promise<string> {
-    const isNativeOut = this.publicBlockchainAdapterService[toBlockchain].isNativeAddress(
-      toToken.address
-    );
+    const isNativeTokenInSrcNetwork = this.publicBlockchainAdapterService[
+      toBlockchain
+    ].isNativeAddress(fromToken.address);
 
     const transferData = await this.prepareTransfer(
       fromAmount,
       fromBlockchain,
       fromToken,
       toBlockchain,
+      toToken,
       smartRouting,
-      isNativeOut
+      isNativeTokenInSrcNetwork
     );
 
     console.log(transferData);
@@ -60,12 +72,14 @@ export class InterchainMessageService {
     ].tryExecuteContractMethod(
       transferData.caller,
       IM_CONTRACT_ABI,
-      isNativeOut ? 'transferWithSwapNative' : 'transferWithSwap',
+      isNativeTokenInSrcNetwork ? 'transferWithSwapNative' : 'transferWithSwap',
       transferData.methodArguments,
       {
         value: transferData.msgValue,
         onTransactionHash: (hash: string) => {
-          onTxHash(hash);
+          if (onTxHash) {
+            onTxHash(hash);
+          }
           transactionHash = hash;
         }
       }
@@ -74,20 +88,14 @@ export class InterchainMessageService {
     return transactionHash;
   }
 
-  public async getMinTokenAmount(fromBlockchain: BLOCKCHAIN_NAME): Promise<string> {
-    const imContractAddress = TRANSFER_SWAP_CONTRACT_BY_BLOCKCHAIN[fromBlockchain];
-    return await this.publicBlockchainAdapterService[
-      fromBlockchain as Web3SupportedBlockchains
-    ].callContractMethod(imContractAddress, IM_CONTRACT_ABI, 'minSwapAmount');
-  }
-
   private async prepareTransfer(
     fromAmount: BigNumber,
     fromBlockchain: Web3SupportedBlockchains,
     fromToken: TokenAmount,
     toBlockchain: Web3SupportedBlockchains,
+    toToken: TokenAmount,
     smartRouting: SmartRouting,
-    nativeOut?: boolean
+    isNativeTokenInSrcNetwork: boolean
   ): Promise<{
     caller: string;
     msgValue: string;
@@ -96,22 +104,27 @@ export class InterchainMessageService {
     const srcNetwork = networks.find(network => network.name === fromBlockchain);
     const dstNetwork = networks.find(network => network.name === toBlockchain);
 
-    const [sourceBestProvider] = smartRouting.sourceBlockchainProviders;
-    const [targetBestProvider] = smartRouting.targetBlockchainProviders;
+    const [
+      { providerIndex: bestSourceProviderIndex, tradeAndToAmount: bestSourceTradeAndToAmount }
+    ] = smartRouting.sourceBlockchainProviders;
+    const [
+      { providerIndex: bestTargetProviderIndex, tradeAndToAmount: bestTargetTradeAndToAmount }
+    ] = smartRouting.targetBlockchainProviders;
 
-    const sourceProvider = this.contractsDataService.contracts[fromBlockchain].getProvider(
-      sourceBestProvider.providerIndex
-    );
-    const targetProvider = this.contractsDataService.contracts[toBlockchain].getProvider(
-      targetBestProvider.providerIndex
-    );
+    const sourceProvider =
+      this.contractsDataService.contracts[fromBlockchain].getProvider(bestSourceProviderIndex);
+    const targetProvider =
+      this.contractsDataService.contracts[toBlockchain].getProvider(bestTargetProviderIndex);
 
     const { timestamp: nonce } = await this.publicBlockchainAdapterService[
       fromBlockchain
     ].getBlock();
-    const caller = TRANSFER_SWAP_CONTRACT_BY_BLOCKCHAIN[srcNetwork.name];
-    const receiver = TRANSFER_SWAP_CONTRACT_BY_BLOCKCHAIN[dstNetwork.name];
+    const caller = IM_CONTRACT_BY_BLOCKCHAIN[srcNetwork.name];
+    const receiver = IM_CONTRACT_BY_BLOCKCHAIN[dstNetwork.name];
     const amountIn = Web3Pure.toWei(fromAmount, fromToken.decimals);
+    const nativeOut = this.publicBlockchainAdapterService[toBlockchain].isNativeAddress(
+      toToken.address
+    );
 
     // hardcoded
     const maxBridgeSlippage = 1000000;
@@ -119,13 +132,15 @@ export class InterchainMessageService {
     const minRecvAmt = 0;
 
     const srcSwap = {
-      path: sourceBestProvider.tradeAndToAmount.trade.path.map(path => path.address),
+      path: bestSourceTradeAndToAmount.trade?.path?.map(path => path.address) || [
+        fromToken.address
+      ],
       dex: sourceProvider.contractAddress,
       deadline,
       minRecvAmt
     };
     const dstSwap = {
-      path: targetBestProvider.tradeAndToAmount.trade.path.map(path => path.address),
+      path: bestTargetTradeAndToAmount.trade?.path?.map(path => path.address) || [toToken.address],
       dex: targetProvider.contractAddress,
       deadline,
       minRecvAmt
@@ -138,20 +153,59 @@ export class InterchainMessageService {
       this.prepareSwapObject(srcSwap),
       this.prepareSwapObject(dstSwap),
       maxBridgeSlippage.toString(),
-      nonce.toString()
+      nonce.toString(),
+      String(nativeOut)
     ];
 
-    if (nativeOut) {
-      methodArguments.push(String(nativeOut));
-    }
-
-    const msgValue = this.calculateMsgValue(methodArguments, Number(amountIn)).toString();
+    const msgValue = await this.calculateMsgValue(
+      fromBlockchain,
+      dstNetwork.id,
+      methodArguments,
+      isNativeTokenInSrcNetwork,
+      amountIn
+    );
 
     return {
       caller,
       msgValue,
       methodArguments
     };
+  }
+
+  private async calculateMsgValue(
+    fromBlockchain: Web3SupportedBlockchains,
+    targetNetworkId: number,
+    swapArguments: transferWithSwapArgs,
+    isNativeTokenInSrcNetwork: boolean,
+    amountIn: string
+  ): Promise<string> {
+    const cryptoFee = await this.publicBlockchainAdapterService[fromBlockchain].callContractMethod(
+      IM_CONTRACT_BY_BLOCKCHAIN[fromBlockchain],
+      IM_CONTRACT_ABI,
+      'dstCryptoFee',
+      {
+        methodArguments: [targetNetworkId]
+      }
+    );
+    console.log('cryptoFee', cryptoFee);
+
+    const message = EthLikeWeb3Pure.asciiToBytes32(JSON.stringify(swapArguments));
+    const messageBusAddress = await this.publicBlockchainAdapterService[
+      fromBlockchain
+    ].callContractMethod(IM_CONTRACT_BY_BLOCKCHAIN[fromBlockchain], IM_CONTRACT_ABI, 'messageBus');
+    const feeBase = await this.publicBlockchainAdapterService[fromBlockchain].callContractMethod(
+      messageBusAddress,
+      MESSAGE_BUS_CONTRACT_ABI,
+      'calcFee',
+      { methodArguments: [message] }
+    );
+    console.log('fee', feeBase);
+
+    if (isNativeTokenInSrcNetwork) {
+      return amountIn + feeBase + cryptoFee;
+    } else {
+      return feeBase + cryptoFee;
+    }
   }
 
   private prepareSwapObject(swap: ImSwapInfo): (string | string[])[] {
@@ -162,10 +216,5 @@ export class InterchainMessageService {
         return String(value);
       }
     });
-  }
-
-  private calculateMsgValue(data: transferWithSwapArgs, amountIn: number): number {
-    const byteLength = new Blob([JSON.stringify(data)]).size;
-    return amountIn * IM_FEE_BASE + byteLength * IM_FEE_PER_BYTE;
   }
 }

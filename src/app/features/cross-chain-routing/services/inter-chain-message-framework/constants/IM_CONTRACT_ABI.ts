@@ -66,6 +66,13 @@ export const IM_CONTRACT_ABI = [
     type: 'event'
   },
   {
+    inputs: [],
+    name: 'decimals',
+    outputs: [{ internalType: 'uint8', name: '', type: 'uint8' }],
+    stateMutability: 'view',
+    type: 'function'
+  },
+  {
     inputs: [
       { internalType: 'address', name: '_sender', type: 'address' },
       { internalType: 'uint64', name: '_srcChainId', type: 'uint64' },
@@ -92,8 +99,8 @@ export const IM_CONTRACT_ABI = [
   {
     inputs: [
       { internalType: 'address', name: '', type: 'address' },
-      { internalType: 'address', name: '', type: 'address' },
-      { internalType: 'uint256', name: '', type: 'uint256' },
+      { internalType: 'address', name: '_token', type: 'address' },
+      { internalType: 'uint256', name: '_amount', type: 'uint256' },
       { internalType: 'uint64', name: '_srcChainId', type: 'uint64' },
       { internalType: 'bytes', name: '_message', type: 'bytes' }
     ],
@@ -115,14 +122,21 @@ export const IM_CONTRACT_ABI = [
   },
   {
     inputs: [],
+    name: 'feeRubic',
+    outputs: [{ internalType: 'uint256', name: '', type: 'uint256' }],
+    stateMutability: 'view',
+    type: 'function'
+  },
+  {
+    inputs: [],
     name: 'messageBus',
     outputs: [{ internalType: 'address', name: '', type: 'address' }],
     stateMutability: 'view',
     type: 'function'
   },
   {
-    inputs: [{ internalType: 'address', name: '', type: 'address' }],
-    name: 'minSwapAmounts',
+    inputs: [],
+    name: 'minSwapAmount',
     outputs: [{ internalType: 'uint256', name: '', type: 'uint256' }],
     stateMutability: 'view',
     type: 'function'
@@ -142,6 +156,23 @@ export const IM_CONTRACT_ABI = [
     type: 'function'
   },
   {
+    inputs: [
+      { internalType: 'uint64', name: '_networkID', type: 'uint64' },
+      { internalType: 'uint256', name: '_amount', type: 'uint256' }
+    ],
+    name: 'setCryptoFee',
+    outputs: [],
+    stateMutability: 'nonpayable',
+    type: 'function'
+  },
+  {
+    inputs: [{ internalType: 'uint8', name: '_decimals', type: 'uint8' }],
+    name: 'setDecimalsUSD',
+    outputs: [],
+    stateMutability: 'nonpayable',
+    type: 'function'
+  },
+  {
     inputs: [{ internalType: 'address', name: '_messageBus', type: 'address' }],
     name: 'setMessageBus',
     outputs: [],
@@ -149,10 +180,7 @@ export const IM_CONTRACT_ABI = [
     type: 'function'
   },
   {
-    inputs: [
-      { internalType: 'address', name: '_token', type: 'address' },
-      { internalType: 'uint256', name: '_minSwapAmount', type: 'uint256' }
-    ],
+    inputs: [{ internalType: 'uint256', name: '_minSwapAmount', type: 'uint256' }],
     name: 'setMinSwapAmount',
     outputs: [],
     stateMutability: 'nonpayable',
@@ -161,6 +189,13 @@ export const IM_CONTRACT_ABI = [
   {
     inputs: [{ internalType: 'address', name: '_nativeWrap', type: 'address' }],
     name: 'setNativeWrap',
+    outputs: [],
+    stateMutability: 'nonpayable',
+    type: 'function'
+  },
+  {
+    inputs: [{ internalType: 'uint256', name: '_feeRubic', type: 'uint256' }],
+    name: 'setRubicFee',
     outputs: [],
     stateMutability: 'nonpayable',
     type: 'function'
@@ -217,7 +252,8 @@ export const IM_CONTRACT_ABI = [
         type: 'tuple'
       },
       { internalType: 'uint32', name: '_maxBridgeSlippage', type: 'uint32' },
-      { internalType: 'uint64', name: '_nonce', type: 'uint64' }
+      { internalType: 'uint64', name: '_nonce', type: 'uint64' },
+      { internalType: 'bool', name: '_nativeOut', type: 'bool' }
     ],
     name: 'transferWithSwap',
     outputs: [],
@@ -258,13 +294,6 @@ export const IM_CONTRACT_ABI = [
     name: 'transferWithSwapNative',
     outputs: [],
     stateMutability: 'payable',
-    type: 'function'
-  },
-  {
-    inputs: [],
-    name: 'minSwapAmount',
-    outputs: [{ internalType: 'uint256', name: '', type: 'uint256' }],
-    stateMutability: 'view',
     type: 'function'
   },
   { stateMutability: 'payable', type: 'receive' }

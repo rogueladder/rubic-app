@@ -53,6 +53,7 @@ import { BridgeService } from '../../services/bridge-service/bridge.service';
 import { BridgeTradeRequest } from 'src/app/features/bridge/models/bridge-trade-request';
 import { ERROR_TYPE } from '@core/errors/models/error-type';
 import { SWAP_PROVIDER_TYPE } from '@app/features/swaps/models/swap-provider-type';
+import { SwapsService } from '@app/features/swaps/services/swaps-service/swaps.service';
 
 @Component({
   selector: 'app-bridge-bottom-form',
@@ -104,6 +105,8 @@ export class BridgeBottomFormComponent implements OnInit, OnDestroy {
 
   private tradeInProgressSubscription$: Subscription;
 
+  public readonly swapMode$ = this.swapsService.swapMode$;
+
   public get tradeStatus(): TRADE_STATUS {
     return this._tradeStatus;
   }
@@ -151,7 +154,8 @@ export class BridgeBottomFormComponent implements OnInit, OnDestroy {
     private readonly successTxModalService: SuccessTxModalService,
     private readonly iframeService: IframeService,
     private readonly gtmService: GoogleTagManagerService,
-    @Inject(WINDOW) private readonly window: RubicWindow
+    @Inject(WINDOW) private readonly window: RubicWindow,
+    private readonly swapsService: SwapsService
   ) {
     this.isBridgeSupported = true;
     this.onCalculateTrade$ = new Subject<void>();

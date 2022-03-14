@@ -96,6 +96,7 @@
     [status]="tradeStatus"
     [formService]="swapFormService"
     [fromAmount]="fromAmount"
+    [swapMode]="swapMode$ | async"
     [buttonText]="!ethAndWethTrade ? 'Swap' : isEth.from ? 'Wrap' : 'Unwrap'"
     (swapClick)="createTrade()"
     (approveClick)="approveTrade()"

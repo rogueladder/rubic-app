@@ -56,6 +56,7 @@ import { RubicError } from '@core/errors/models/rubic-error';
 import { GoogleTagManagerService } from '@core/services/google-tag-manager/google-tag-manager.service';
 import { SWAP_PROVIDER_TYPE } from '@features/swaps/models/swap-provider-type';
 import { WalletConnectorService } from '@core/services/blockchain/wallets/wallet-connector-service/wallet-connector.service';
+import { SwapsService } from '@app/features/swaps/services/swaps-service/swaps.service';
 
 export interface CalculationResult {
   status: 'fulfilled' | 'rejected';
@@ -95,6 +96,8 @@ export class InstantTradeBottomFormComponent implements OnInit, OnDestroy {
 
   // eslint-disable-next-line rxjs/no-exposed-subjects
   public readonly onCalculateTrade$: Subject<'normal' | 'hidden'>;
+
+  public readonly swapMode$ = this.swapsService.swapMode$;
 
   private hiddenDataAmounts$: BehaviorSubject<
     { name: INSTANT_TRADES_PROVIDERS; amount: BigNumber; error?: RubicError<ERROR_TYPE> | Error }[]
@@ -194,7 +197,8 @@ export class InstantTradeBottomFormComponent implements OnInit, OnDestroy {
     @Self() private readonly destroy$: TuiDestroyService,
     private readonly swapInfoService: SwapInfoService,
     private readonly walletConnectorService: WalletConnectorService,
-    private readonly gtmService: GoogleTagManagerService
+    private readonly gtmService: GoogleTagManagerService,
+    private readonly swapsService: SwapsService
   ) {
     this.autoSelect = true;
     this.isIframe = this.iframeService.isIframe;

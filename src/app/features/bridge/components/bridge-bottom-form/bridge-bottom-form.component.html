@@ -16,6 +16,7 @@
         [needApprove]="needApprove"
         [status]="tradeStatus"
         [formService]="swapFormService"
+        [swapMode]="swapMode$ | async"
         [fromAmount]="fromAmount"
         [isBridgeNotSupported]="!isBridgeSupported"
         [minAmount]="minError"

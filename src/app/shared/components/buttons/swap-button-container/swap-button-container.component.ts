@@ -32,6 +32,7 @@ import { NATIVE_SOLANA_MINT_ADDRESS } from '@shared/constants/blockchain/native-
 import { BlockchainsInfo } from '@core/services/blockchain/blockchain-info';
 import { TargetNetworkAddressService } from '@features/cross-chain-routing/components/target-network-address/services/target-network-address.service';
 import { Web3Pure } from '@core/services/blockchain/blockchain-adapters/common/web3-pure';
+import { SWAP_PROVIDER_TYPE } from '@app/features/swaps/models/swap-provider-type';
 
 enum ERROR_TYPE {
   INSUFFICIENT_FUNDS = 'Insufficient balance',
@@ -54,6 +55,8 @@ enum ERROR_TYPE {
   providers: [TuiDestroyService]
 })
 export class SwapButtonContainerComponent implements OnInit {
+  @Input() swapMode: SWAP_PROVIDER_TYPE;
+
   @Input() needApprove = false;
 
   @Input() status: TRADE_STATUS;
@@ -87,12 +90,12 @@ export class SwapButtonContainerComponent implements OnInit {
   private minAmountValue: string;
 
   @Input() set maxAmount(value: false | number | BigNumber) {
-    if (value) {
+    if (this.swapMode !== SWAP_PROVIDER_TYPE.CROSS_CHAIN_ROUTING && value) {
       if (typeof value === 'number') {
         this.maxAmountValue = value.toString();
       } else {
         this.maxAmountValue = this.withRoundPipe.transform(
-          value.toFormat(BIG_NUMBER_FORMAT),
+          (value as BigNumber)?.toFormat(BIG_NUMBER_FORMAT),
           'toClosestValue'
         );
       }

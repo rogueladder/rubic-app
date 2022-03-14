@@ -51,6 +51,8 @@ import { BlockchainsInfo } from '@core/services/blockchain/blockchain-info';
 import { ERROR_TYPE } from '@core/errors/models/error-type';
 import { RubicError } from '@core/errors/models/rubic-error';
 import { SWAP_PROVIDER_TYPE } from '@features/swaps/models/swap-provider-type';
+import { InterchainMessageService } from '../../services/inter-chain-message-framework/inter-chain-message.service';
+import { SwapsService } from '@app/features/swaps/services/swaps-service/swaps.service';
 
 type CalculateTradeType = 'normal' | 'hidden';
 
@@ -86,6 +88,8 @@ export class CrossChainRoutingBottomFormComponent implements OnInit {
   public readonly smartRouting$ = this.crossChainRoutingService.smartRouting$;
 
   public readonly smartRoutingLoading$ = this.crossChainRoutingService.smartRoutingLoading$;
+
+  public readonly swapMode$ = this.swapsService.swapMode$;
 
   public toBlockchain: BLOCKCHAIN_NAME;
 
@@ -159,7 +163,9 @@ export class CrossChainRoutingBottomFormComponent implements OnInit {
     @Inject(WINDOW) private readonly window: RubicWindow,
     private readonly gtmService: GoogleTagManagerService,
     private readonly successTxModalService: SuccessTxModalService,
-    private readonly targetNetworkAddressService: TargetNetworkAddressService
+    private readonly targetNetworkAddressService: TargetNetworkAddressService,
+    private readonly swapsService: SwapsService,
+    private readonly imService: InterchainMessageService
   ) {}
 
   ngOnInit() {
@@ -192,6 +198,9 @@ export class CrossChainRoutingBottomFormComponent implements OnInit {
     this.settingsService.crossChainRoutingValueChanges
       .pipe(startWith(this.settingsService.crossChainRoutingValue), takeUntil(this.destroy$))
       .subscribe(() => {
+        from(
+          this.imService.getMinTokenAmount(this.swapFormService.inputValue.fromBlockchain)
+        ).subscribe(console.log);
         this.conditionalCalculate('normal');
       });
 
