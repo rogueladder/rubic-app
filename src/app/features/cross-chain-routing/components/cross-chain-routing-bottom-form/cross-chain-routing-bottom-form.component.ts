@@ -198,9 +198,6 @@ export class CrossChainRoutingBottomFormComponent implements OnInit {
     this.settingsService.crossChainRoutingValueChanges
       .pipe(startWith(this.settingsService.crossChainRoutingValue), takeUntil(this.destroy$))
       .subscribe(() => {
-        from(
-          this.imService.getMinTokenAmount(this.swapFormService.inputValue.fromBlockchain)
-        ).subscribe(console.log);
         this.conditionalCalculate('normal');
       });
 
