@@ -18,7 +18,8 @@ import { WalletConnectorService } from '@core/services/blockchain/wallets/wallet
 import { BlockchainToken } from '@shared/models/tokens/blockchain-token';
 import {
   PublicBlockchainAdapterService,
-  Web3SupportedBlockchains
+  Web3SupportedBlockchains,
+  WEB3_SUPPORTED_BLOCKCHAINS
 } from '@core/services/blockchain/blockchain-adapters/public-blockchain-adapter.service';
 import { Injectable } from '@angular/core';
 import { EthLikeWeb3PrivateService } from '@core/services/blockchain/blockchain-adapters/eth-like/web3-private/eth-like-web3-private.service';
@@ -284,8 +285,6 @@ export class CrossChainRoutingService {
     this.shouldSwapViaIm = this.getShouldSwapViaIm(
       fromBlockchain,
       toBlockchain,
-      fromProviderIndex,
-      toProviderIndex,
       fromAmount,
       minMaxErrors
     );
@@ -302,13 +301,12 @@ export class CrossChainRoutingService {
       this.swapFormService.inputValue;
 
     try {
-      const transactionHash = await this.interchainMessageSerivce.interChainMessageSwap(
+      const transactionHash = await this.interchainMessageSerivce.makeImTransferWithSwap(
         fromAmount,
         fromBlockchain as Web3SupportedBlockchains,
         fromToken,
         toToken,
         toBlockchain as Web3SupportedBlockchains,
-        this.smartRouting,
         onTxHash
       );
       return transactionHash;
@@ -789,11 +787,15 @@ export class CrossChainRoutingService {
 
         let transactionHash;
         try {
-          transactionHash = await this.contractExecutorFacade.executeTrade(
-            this.currentCrossChainTrade,
-            options,
-            this.authService.userAddress
-          );
+          if (true) {
+            transactionHash = await this.swapViaImFramework(options.onTransactionHash);
+          } else {
+            transactionHash = await this.contractExecutorFacade.executeTrade(
+              this.currentCrossChainTrade,
+              options,
+              this.authService.userAddress
+            );
+          }
 
           await this.postCrossChainTradeAndNotifyGtm(transactionHash);
         } catch (err) {
@@ -858,22 +860,23 @@ export class CrossChainRoutingService {
   private getShouldSwapViaIm(
     fromBlockchain: BLOCKCHAIN_NAME,
     toBlockchain: BLOCKCHAIN_NAME,
-    fromProviderIndex: number,
-    toProviderIndex: number,
     fromTokenAmount: BigNumber,
     minMaxErrors: { minAmountError?: BigNumber; maxAmountError?: BigNumber }
   ): boolean {
-    const sourceBlockchainContract = this.contracts[fromBlockchain as Web3SupportedBlockchains];
-    const isUnsupportedDexInSourceNetwork =
-      sourceBlockchainContract.isProviderUniV3(fromProviderIndex) ||
-      sourceBlockchainContract.isProviderOneinch(fromProviderIndex);
+    const isUnsupportedBlockchain =
+      !WEB3_SUPPORTED_BLOCKCHAINS.includes(fromBlockchain as Web3SupportedBlockchains) ||
+      !WEB3_SUPPORTED_BLOCKCHAINS.includes(toBlockchain as Web3SupportedBlockchains);
+    // const sourceBlockchainContract = this.contracts[fromBlockchain as Web3SupportedBlockchains];
+    // const isUnsupportedDexInSourceNetwork =
+    //   sourceBlockchainContract.isProviderUniV3(fromProviderIndex) ||
+    //   sourceBlockchainContract.isProviderOneinch(fromProviderIndex);
 
-    const targetBlockchainContract = this.contracts[toBlockchain as Web3SupportedBlockchains];
-    const isUnsupportedDexInTargetNetwork =
-      targetBlockchainContract.isProviderUniV3(toProviderIndex) ||
-      targetBlockchainContract.isProviderOneinch(toProviderIndex);
+    // const targetBlockchainContract = this.contracts[toBlockchain as Web3SupportedBlockchains];
+    // const isUnsupportedDexInTargetNetwork =
+    //   targetBlockchainContract.isProviderUniV3(toProviderIndex) ||
+    //   targetBlockchainContract.isProviderOneinch(toProviderIndex);
 
-    if (isUnsupportedDexInSourceNetwork || isUnsupportedDexInTargetNetwork) {
+    if (isUnsupportedBlockchain) {
       return false;
     } else {
       if (
@@ -951,6 +954,7 @@ export class CrossChainRoutingService {
       }
     }
 
+    this.interchainMessageSerivce.smartRouting = smartRouting;
     this._smartRouting$.next(smartRouting);
     this._smartRoutingLoading$.next(false);
   }

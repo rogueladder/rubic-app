@@ -1,10 +1,3 @@
-import { BLOCKCHAIN_NAME } from '@app/shared/models/blockchain/blockchain-name';
+import { WEB3_SUPPORTED_BLOCKCHAINS } from '@app/core/services/blockchain/blockchain-adapters/public-blockchain-adapter.service';
 
-export const IM_SUPPORTED_BLOCKCHAINS = [
-  BLOCKCHAIN_NAME.ETHEREUM,
-  BLOCKCHAIN_NAME.BINANCE_SMART_CHAIN,
-  BLOCKCHAIN_NAME.POLYGON,
-  BLOCKCHAIN_NAME.FANTOM,
-  BLOCKCHAIN_NAME.AVALANCHE,
-  BLOCKCHAIN_NAME.ARBITRUM
-];
+export const IM_SUPPORTED_BLOCKCHAINS = WEB3_SUPPORTED_BLOCKCHAINS;

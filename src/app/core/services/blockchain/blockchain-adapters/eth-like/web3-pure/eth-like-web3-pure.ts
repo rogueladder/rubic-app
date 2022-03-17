@@ -37,7 +37,10 @@ export class EthLikeWeb3Pure {
    * @param parameter Parameter to encode.
    * @return string Encoded parameter.
    */
-  public static async encodeParameter(type: 'uint256', parameter: unknown): Promise<string> {
+  public static encodeParameter(
+    type: 'uint256' | 'bytes' | 'bytes32' | 'bytes32[]',
+    parameter: unknown
+  ): string {
     return EthLikeWeb3Pure.web3.eth.abi.encodeParameter(type, parameter);
   }
 }

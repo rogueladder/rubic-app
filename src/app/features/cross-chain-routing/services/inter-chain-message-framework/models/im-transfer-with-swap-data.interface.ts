@@ -1,11 +1,9 @@
-import { ImSwapInfo } from './im-swap-info.interface';
-
-export interface ImTransferWithSwapData {
+export interface ImTransferWithSwapDataExtended<T> {
   receiver: string;
   amountIn: string;
   dstChainId: number;
-  srcSwap: ImSwapInfo;
-  dstSwap: ImSwapInfo;
+  srcSwap: T;
+  dstSwap: T;
   maxBridgeSlippage: number;
   nonce?: number;
   nativeOut?: boolean;
