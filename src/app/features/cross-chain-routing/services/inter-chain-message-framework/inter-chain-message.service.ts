@@ -20,6 +20,8 @@ import { ProviderType } from './models/provider-type.enum';
 import { IM_SWAP_NATIVE_METHODS } from './constants/IM_SWAP_NATIVE_METHODS';
 import { IM_SWAP_METHODS } from './constants/IM_SWAP_METHODS';
 import { BLOCKCHAIN_NAME } from '@app/shared/models/blockchain/blockchain-name';
+import { TokensService } from '@app/core/services/tokens/tokens.service';
+import { transitTokens } from '../cross-chain-routing-service/contracts-data/contract-data/constants/transit-tokens';
 
 @Injectable()
 export class InterchainMessageService {
@@ -41,6 +43,7 @@ export class InterchainMessageService {
     private readonly privateBlockchainAdapterService: PrivateBlockchainAdapterService,
     private readonly publicBlockchainAdapterService: PublicBlockchainAdapterService,
     private readonly contractsDataService: ContractsDataService,
+    private readonly tokensService: TokensService,
     private readonly settingsService: SettingsService
   ) {}
 
@@ -71,7 +74,7 @@ export class InterchainMessageService {
     const caller = this.getImContractAddress(fromBlockchain);
     const nonce = await this.getNonce(fromBlockchain);
     const srcSwap = await this.getSrcSwapObject(sourceProviderType, fromBlockchain);
-    const dstSwap = await this.getDstSwapObject(targetProviderType, toBlockchain);
+    const dstSwap = await this.getDstSwapObject(targetProviderType, toToken, toBlockchain);
     const nativeOut = this.isNativeToken(toBlockchain, toToken);
     const nativeIn = this.isNativeToken(fromBlockchain, fromToken);
 
@@ -98,6 +101,8 @@ export class InterchainMessageService {
       nativeIn,
       amountIn
     );
+    console.log('msgValue', msgValue);
+    console.log('args', preparedArguments);
 
     let transactionHash: string;
 
@@ -109,7 +114,7 @@ export class InterchainMessageService {
       nativeIn ? IM_SWAP_NATIVE_METHODS[sourceProviderType] : IM_SWAP_METHODS[sourceProviderType],
       preparedArguments,
       {
-        value: msgValue,
+        value: msgValue.toString(),
         onTransactionHash: (hash: string) => {
           if (onTxHash) {
             onTxHash(hash);
@@ -178,16 +183,19 @@ export class InterchainMessageService {
       }
       case ProviderType.V2: {
         return {
-          path: bestSourceTradeAndToAmount.trade?.path?.map(path => path.address),
           dex: sourceProvider.contractAddress,
+          path: bestSourceTradeAndToAmount.trade?.path?.map(path => path.address),
           deadline: 999999999999999,
-          minRecvAmt: 0
+          amountOutMinimum: 0
         };
       }
       case ProviderType.V3: {
+        const pathV3 = EthLikeWeb3Pure.asciiToBytes32(
+          JSON.stringify(bestSourceTradeAndToAmount.trade?.path?.map(token => token.address))
+        );
         return {
           dex: sourceProvider.contractAddress,
-          path: EthLikeWeb3Pure.encodeParameter('bytes', bestSourceTradeAndToAmount.trade?.path),
+          path: pathV3,
           deadline: 999999999999999,
           amountOutMinimum: 0
         };
@@ -195,26 +203,63 @@ export class InterchainMessageService {
     }
   }
 
-  private getDstSwapObject(
+  private async getDstSwapObject(
     targetProviderType: ProviderType,
+    toToken: TokenAmount,
     toBlockchain: Web3SupportedBlockchains
-  ): unknown {
-    const [{ providerIndex: bestTargetProviderIndex }] =
-      this.smartRouting.targetBlockchainProviders;
+    // amountIn: BigNumber
+  ): Promise<unknown> {
+    const [
+      { providerIndex: bestTargetProviderIndex, tradeAndToAmount: bestTargetTradeAndToAmount }
+    ] = this.smartRouting.targetBlockchainProviders;
     const targetProvider =
       this.contractsDataService.contracts[toBlockchain].getProvider(bestTargetProviderIndex);
+    const toTokenUsdcPrice = await this.tokensService.getAndUpdateTokenPrice({
+      address: toToken.address,
+      blockchain: toBlockchain
+    });
+    const minRecvAmt = bestTargetTradeAndToAmount.toAmount
+      .multipliedBy(toTokenUsdcPrice)
+      .multipliedBy(1 - this.ccrSlippage);
 
+    const dstSwapObject: {
+      dex: string;
+      path: string[] | null;
+      pathV3: string;
+      deadline: number;
+      data: string | null;
+      amountOutMinimum: string;
+      version: number;
+    } = {
+      dex: targetProvider.contractAddress,
+      path: ['0x0000000000000000000000000000000000000000'],
+      pathV3: '0x',
+      deadline: 999999999999999,
+      data: '0x',
+      amountOutMinimum: Web3Pure.toWei(minRecvAmt, transitTokens[toBlockchain].decimals),
+      version: Object.values(ProviderType).indexOf(targetProviderType)
+    };
     switch (targetProviderType) {
       case ProviderType.INCH: {
-        return targetProvider;
+        const instantTrade = bestTargetTradeAndToAmount.trade as OneinchInstantTrade;
+        dstSwapObject.data = instantTrade.data;
+        dstSwapObject.path = instantTrade.path.map(token => token.address);
+        break;
       }
       case ProviderType.V2: {
-        return '';
+        dstSwapObject.path = bestTargetTradeAndToAmount.trade?.path?.map(path => path.address);
+        break;
       }
       case ProviderType.V3: {
-        return '';
+        const pathV3 = EthLikeWeb3Pure.asciiToBytes32(
+          JSON.stringify(bestTargetTradeAndToAmount.trade?.path?.map(path => path.address))
+        );
+        dstSwapObject.pathV3 = pathV3;
+        break;
       }
     }
+
+    return dstSwapObject;
   }
 
   private async calculateMsgValue(
@@ -223,7 +268,7 @@ export class InterchainMessageService {
     data: unknown,
     nativeIn: boolean,
     amountIn: string
-  ): Promise<string> {
+  ): Promise<number> {
     const targetNetworkId = networks.find(network => network.name === toBlockchain).id.toString();
     const imContractAddress = this.getImContractAddress(fromBlockchain);
 
@@ -235,7 +280,6 @@ export class InterchainMessageService {
         methodArguments: [targetNetworkId]
       }
     );
-    console.log('cryptoFee', cryptoFee);
 
     const message = EthLikeWeb3Pure.asciiToBytes32(JSON.stringify(data));
     const messageBusAddress = await this.publicBlockchainAdapterService[
@@ -247,12 +291,11 @@ export class InterchainMessageService {
       'calcFee',
       { methodArguments: [message] }
     );
-    console.log('fee', feeBase);
 
     if (nativeIn) {
-      return amountIn + feeBase + cryptoFee;
+      return Number(amountIn) + Number(feeBase) + Number(cryptoFee);
     }
-    return feeBase + cryptoFee;
+    return Number(feeBase) + Number(cryptoFee);
   }
 
   private prepareArgs(args: unknown[]): unknown[] {

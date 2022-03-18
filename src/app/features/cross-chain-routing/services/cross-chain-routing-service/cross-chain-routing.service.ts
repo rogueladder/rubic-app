@@ -44,7 +44,6 @@ import BigNumber from 'bignumber.js';
 import { TransactionReceipt } from 'web3-eth';
 import { CrossChainTradeInfo } from '@features/cross-chain-routing/services/cross-chain-routing-service/models/cross-chain-trade-info';
 import { TokenAmount } from '@shared/models/tokens/token-amount';
-import { GoogleTagManagerService } from '@core/services/google-tag-manager/google-tag-manager.service';
 import { TuiNotification } from '@taiga-ui/core';
 import { IframeService } from '@core/services/iframe/iframe.service';
 import { NotificationsService } from '@core/services/notifications/notifications.service';
@@ -126,7 +125,6 @@ export class CrossChainRoutingService {
     private readonly contractExecutorFacade: ContractExecutorFacadeService,
     private readonly ethLikeContractExecutor: EthLikeContractExecutorService,
     private readonly solanaPrivateAdapter: SolanaWeb3PrivateService,
-    private readonly gtmService: GoogleTagManagerService,
     private readonly iframeService: IframeService,
     private readonly notificationsService: NotificationsService,
     private readonly translateService: TranslateService,
@@ -448,7 +446,7 @@ export class CrossChainRoutingService {
           ? await this.interchainMessageSerivce.getMinTokenAmount(fromBlockchain)
           : await contract.maxTokenAmount();
       const fromTransitTokenAmount = Web3Pure.fromWei(
-        fromTransitTokenAmountAbsolute,
+        type === 'minAmount' ? new BigNumber(8000000) : fromTransitTokenAmountAbsolute,
         fromTransitToken.decimals
       );
 
@@ -866,15 +864,6 @@ export class CrossChainRoutingService {
     const isUnsupportedBlockchain =
       !WEB3_SUPPORTED_BLOCKCHAINS.includes(fromBlockchain as Web3SupportedBlockchains) ||
       !WEB3_SUPPORTED_BLOCKCHAINS.includes(toBlockchain as Web3SupportedBlockchains);
-    // const sourceBlockchainContract = this.contracts[fromBlockchain as Web3SupportedBlockchains];
-    // const isUnsupportedDexInSourceNetwork =
-    //   sourceBlockchainContract.isProviderUniV3(fromProviderIndex) ||
-    //   sourceBlockchainContract.isProviderOneinch(fromProviderIndex);
-
-    // const targetBlockchainContract = this.contracts[toBlockchain as Web3SupportedBlockchains];
-    // const isUnsupportedDexInTargetNetwork =
-    //   targetBlockchainContract.isProviderUniV3(toProviderIndex) ||
-    //   targetBlockchainContract.isProviderOneinch(toProviderIndex);
 
     if (isUnsupportedBlockchain) {
       return false;

@@ -100,8 +100,7 @@ export const IM_CONTRACT_ABI = [
       { indexed: false, internalType: 'bytes32', name: 'id', type: 'bytes32' },
       { indexed: false, internalType: 'uint64', name: 'dstChainId', type: 'uint64' },
       { indexed: false, internalType: 'uint256', name: 'srcAmount', type: 'uint256' },
-      { indexed: false, internalType: 'address', name: 'srcToken', type: 'address' },
-      { indexed: false, internalType: 'address', name: 'dstToken', type: 'address' }
+      { indexed: false, internalType: 'address', name: 'srcToken', type: 'address' }
     ],
     name: 'SwapRequestSentInch',
     type: 'event'
@@ -112,8 +111,7 @@ export const IM_CONTRACT_ABI = [
       { indexed: false, internalType: 'bytes32', name: 'id', type: 'bytes32' },
       { indexed: false, internalType: 'uint64', name: 'dstChainId', type: 'uint64' },
       { indexed: false, internalType: 'uint256', name: 'srcAmount', type: 'uint256' },
-      { indexed: false, internalType: 'address', name: 'srcToken', type: 'address' },
-      { indexed: false, internalType: 'address', name: 'dstToken', type: 'address' }
+      { indexed: false, internalType: 'address', name: 'srcToken', type: 'address' }
     ],
     name: 'SwapRequestSentV2',
     type: 'event'
@@ -124,8 +122,7 @@ export const IM_CONTRACT_ABI = [
       { indexed: false, internalType: 'bytes32', name: 'id', type: 'bytes32' },
       { indexed: false, internalType: 'uint64', name: 'dstChainId', type: 'uint64' },
       { indexed: false, internalType: 'uint256', name: 'srcAmount', type: 'uint256' },
-      { indexed: false, internalType: 'address', name: 'srcToken', type: 'address' },
-      { indexed: false, internalType: 'address', name: 'dstToken', type: 'address' }
+      { indexed: false, internalType: 'address', name: 'srcToken', type: 'address' }
     ],
     name: 'SwapRequestSentV3',
     type: 'event'
@@ -158,20 +155,6 @@ export const IM_CONTRACT_ABI = [
   {
     inputs: [
       { internalType: 'address', name: '', type: 'address' },
-      { internalType: 'address', name: '_token', type: 'address' },
-      { internalType: 'uint256', name: '_amount', type: 'uint256' },
-      { internalType: 'uint64', name: '_srcChainId', type: 'uint64' },
-      { internalType: 'bytes', name: '_message', type: 'bytes' },
-      { internalType: 'enum SwapBase.SwapVersion', name: 'version', type: 'uint8' }
-    ],
-    name: 'executeMessageWithTransfer',
-    outputs: [{ internalType: 'bool', name: '', type: 'bool' }],
-    stateMutability: 'payable',
-    type: 'function'
-  },
-  {
-    inputs: [
-      { internalType: 'address', name: '_sender', type: 'address' },
       { internalType: 'address', name: '_token', type: 'address' },
       { internalType: 'uint256', name: '_amount', type: 'uint256' },
       { internalType: 'uint64', name: '_srcChainId', type: 'uint64' },
@@ -330,10 +313,13 @@ export const IM_CONTRACT_ABI = [
         components: [
           { internalType: 'address', name: 'dex', type: 'address' },
           { internalType: 'address[]', name: 'path', type: 'address[]' },
+          { internalType: 'bytes', name: 'pathV3', type: 'bytes' },
+          { internalType: 'uint256', name: 'deadline', type: 'uint256' },
           { internalType: 'bytes', name: 'data', type: 'bytes' },
-          { internalType: 'uint256', name: 'amountOutMinimum', type: 'uint256' }
+          { internalType: 'uint256', name: 'amountOutMinimum', type: 'uint256' },
+          { internalType: 'enum SwapBase.SwapVersion', name: 'version', type: 'uint8' }
         ],
-        internalType: 'struct SwapBase.SwapInfoInch',
+        internalType: 'struct SwapBase.SwapInfoDest',
         name: '_dstSwap',
         type: 'tuple'
       },
@@ -366,10 +352,13 @@ export const IM_CONTRACT_ABI = [
         components: [
           { internalType: 'address', name: 'dex', type: 'address' },
           { internalType: 'address[]', name: 'path', type: 'address[]' },
+          { internalType: 'bytes', name: 'pathV3', type: 'bytes' },
+          { internalType: 'uint256', name: 'deadline', type: 'uint256' },
           { internalType: 'bytes', name: 'data', type: 'bytes' },
-          { internalType: 'uint256', name: 'amountOutMinimum', type: 'uint256' }
+          { internalType: 'uint256', name: 'amountOutMinimum', type: 'uint256' },
+          { internalType: 'enum SwapBase.SwapVersion', name: 'version', type: 'uint8' }
         ],
-        internalType: 'struct SwapBase.SwapInfoInch',
+        internalType: 'struct SwapBase.SwapInfoDest',
         name: '_dstSwap',
         type: 'tuple'
       },
@@ -389,10 +378,10 @@ export const IM_CONTRACT_ABI = [
       { internalType: 'uint64', name: '_dstChainId', type: 'uint64' },
       {
         components: [
-          { internalType: 'address[]', name: 'path', type: 'address[]' },
           { internalType: 'address', name: 'dex', type: 'address' },
+          { internalType: 'address[]', name: 'path', type: 'address[]' },
           { internalType: 'uint256', name: 'deadline', type: 'uint256' },
-          { internalType: 'uint256', name: 'minRecvAmt', type: 'uint256' }
+          { internalType: 'uint256', name: 'amountOutMinimum', type: 'uint256' }
         ],
         internalType: 'struct SwapBase.SwapInfoV2',
         name: '_srcSwap',
@@ -400,12 +389,15 @@ export const IM_CONTRACT_ABI = [
       },
       {
         components: [
-          { internalType: 'address[]', name: 'path', type: 'address[]' },
           { internalType: 'address', name: 'dex', type: 'address' },
+          { internalType: 'address[]', name: 'path', type: 'address[]' },
+          { internalType: 'bytes', name: 'pathV3', type: 'bytes' },
           { internalType: 'uint256', name: 'deadline', type: 'uint256' },
-          { internalType: 'uint256', name: 'minRecvAmt', type: 'uint256' }
+          { internalType: 'bytes', name: 'data', type: 'bytes' },
+          { internalType: 'uint256', name: 'amountOutMinimum', type: 'uint256' },
+          { internalType: 'enum SwapBase.SwapVersion', name: 'version', type: 'uint8' }
         ],
-        internalType: 'struct SwapBase.SwapInfoV2',
+        internalType: 'struct SwapBase.SwapInfoDest',
         name: '_dstSwap',
         type: 'tuple'
       },
@@ -425,10 +417,10 @@ export const IM_CONTRACT_ABI = [
       { internalType: 'uint64', name: '_dstChainId', type: 'uint64' },
       {
         components: [
-          { internalType: 'address[]', name: 'path', type: 'address[]' },
           { internalType: 'address', name: 'dex', type: 'address' },
+          { internalType: 'address[]', name: 'path', type: 'address[]' },
           { internalType: 'uint256', name: 'deadline', type: 'uint256' },
-          { internalType: 'uint256', name: 'minRecvAmt', type: 'uint256' }
+          { internalType: 'uint256', name: 'amountOutMinimum', type: 'uint256' }
         ],
         internalType: 'struct SwapBase.SwapInfoV2',
         name: '_srcSwap',
@@ -436,12 +428,15 @@ export const IM_CONTRACT_ABI = [
       },
       {
         components: [
-          { internalType: 'address[]', name: 'path', type: 'address[]' },
           { internalType: 'address', name: 'dex', type: 'address' },
+          { internalType: 'address[]', name: 'path', type: 'address[]' },
+          { internalType: 'bytes', name: 'pathV3', type: 'bytes' },
           { internalType: 'uint256', name: 'deadline', type: 'uint256' },
-          { internalType: 'uint256', name: 'minRecvAmt', type: 'uint256' }
+          { internalType: 'bytes', name: 'data', type: 'bytes' },
+          { internalType: 'uint256', name: 'amountOutMinimum', type: 'uint256' },
+          { internalType: 'enum SwapBase.SwapVersion', name: 'version', type: 'uint8' }
         ],
-        internalType: 'struct SwapBase.SwapInfoV2',
+        internalType: 'struct SwapBase.SwapInfoDest',
         name: '_dstSwap',
         type: 'tuple'
       },
@@ -473,11 +468,14 @@ export const IM_CONTRACT_ABI = [
       {
         components: [
           { internalType: 'address', name: 'dex', type: 'address' },
-          { internalType: 'bytes', name: 'path', type: 'bytes' },
+          { internalType: 'address[]', name: 'path', type: 'address[]' },
+          { internalType: 'bytes', name: 'pathV3', type: 'bytes' },
           { internalType: 'uint256', name: 'deadline', type: 'uint256' },
-          { internalType: 'uint256', name: 'amountOutMinimum', type: 'uint256' }
+          { internalType: 'bytes', name: 'data', type: 'bytes' },
+          { internalType: 'uint256', name: 'amountOutMinimum', type: 'uint256' },
+          { internalType: 'enum SwapBase.SwapVersion', name: 'version', type: 'uint8' }
         ],
-        internalType: 'struct SwapBase.SwapInfoV3',
+        internalType: 'struct SwapBase.SwapInfoDest',
         name: '_dstSwap',
         type: 'tuple'
       },
@@ -509,11 +507,14 @@ export const IM_CONTRACT_ABI = [
       {
         components: [
           { internalType: 'address', name: 'dex', type: 'address' },
-          { internalType: 'bytes', name: 'path', type: 'bytes' },
+          { internalType: 'address[]', name: 'path', type: 'address[]' },
+          { internalType: 'bytes', name: 'pathV3', type: 'bytes' },
           { internalType: 'uint256', name: 'deadline', type: 'uint256' },
-          { internalType: 'uint256', name: 'amountOutMinimum', type: 'uint256' }
+          { internalType: 'bytes', name: 'data', type: 'bytes' },
+          { internalType: 'uint256', name: 'amountOutMinimum', type: 'uint256' },
+          { internalType: 'enum SwapBase.SwapVersion', name: 'version', type: 'uint8' }
         ],
-        internalType: 'struct SwapBase.SwapInfoV3',
+        internalType: 'struct SwapBase.SwapInfoDest',
         name: '_dstSwap',
         type: 'tuple'
       },
